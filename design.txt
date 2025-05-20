@@ -1,0 +1,29 @@
+---
+title: Project Milestone 3
+Author(s): Anish Pai and Alyssa Rozewicz
+Date: 5/19/2025
+---
+
+High level description  
+=======================
+
+In Milestone 3, we implemented shared address space support across threads. Our design allows multiple threads to operate within the same virtual memory space, enabling them to read and write to shared global and heap memory. Each thread has its own stack to avoid conflicts. 
+
+Thread creation  
+================
+
+We modified `thread_create()` to accept a function pointer, an argument, and a thread stack pointer. Each thread receives a separate stack space within the same address space as the parent process. 
+
+Memory sharing  
+================
+
+To enable memory sharing, we changed the thread creation logic to assign the parent’s `pagetable` to the child thread. This allows all threads to share the same address space. 
+
+Test cases  
+===========
+
+- Describe the test case you used for the creation of the threads.  
+  We created two threads that each printed a message and then terminated. This confirmed successful creation and termination of threads, as well as joining the parent.
+
+- Describe the test case you used for testing shared memory between threads.  
+  We declared a global buffer and created multiple threads and wrote to that buffer
