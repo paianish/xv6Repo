@@ -158,7 +158,7 @@ freeproc(struct proc *p)
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
-  if(p->pagetable)
+  if(p->pagetable && !p->is_thread)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
   p->sz = 0;
@@ -294,6 +294,7 @@ fork(void)
     release(&np->lock);
     return -1;
   }
+  np->is_thread = 0;
   np->sz = p->sz;
 
   // copy saved user registers.
@@ -341,6 +342,7 @@ reparent(struct proc *p)
 }
 
 // Exit the current process.  Does not return.
+
 // An exited process remains in the zombie state
 // until its parent calls wait().
 void
@@ -691,72 +693,111 @@ spoon(void *arg){
 
 uint64
 thread_create(void *start_func, void *arg, void *stack){
-  struct proc *newProc = allocproc();
-  struct proc *curProc = myproc();
 
-  if(newProc == 0){
+  int i, pid;
+  struct proc *np;
+  struct proc *p = myproc();
+
+  // Allocate process.
+  if((np = allocproc()) == 0){
     return -1;
   }
 
-  if(uvmcopy(curProc->pagetable, newProc->pagetable, curProc->sz) < 0){
-    uvmfree(newProc->pagetable, 0);
-    newProc->pagetable = 0;
-    freeproc(newProc);
+  // Copy user memory from parent to child.
+  if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
+    freeproc(np);
+    release(&np->lock);
     return -1;
   }
+  np->is_thread = 0;
+  np->sz = p->sz;
 
-  newProc->sz = curProc->sz;
-  memset(newProc->trapframe, 0, sizeof(struct trapframe));
-  newProc->trapframe->epc = (uint64) start_func;
-  newProc->trapframe->a0 = (uint64)arg;
-  newProc->trapframe->sp = (uint64)stack;
+  // copy saved user registers.
+  memset(np->trapframe, 0, sizeof(struct trapframe));
 
-  for(int i = 0; i < NOFILE; i++){
-    if(curProc->ofile[i]){
-      newProc->ofile[i] = filedup(curProc->ofile[i]);
-    }
-  }
+  // Cause fork to return 0 in the child.
+  np->trapframe->epc = (uint64) start_func;
+  np->trapframe->a0 = (uint64) arg;
+  np->trapframe->sp = (uint64) stack;
+  np->is_thread = 1;
 
-  newProc->cwd = idup(curProc->cwd);
+  // increment reference counts on open file descriptors.
+  for(i = 0; i < NOFILE; i++)
+    if(p->ofile[i])
+      np->ofile[i] = filedup(p->ofile[i]);
+  np->cwd = idup(p->cwd);
 
+  safestrcpy(np->name, p->name, sizeof(p->name));
 
-  newProc->parent = curProc;
-  safestrcpy(newProc->name, curProc->name, sizeof(curProc->name));
+  pid = np->pid;
 
-  newProc->state = RUNNABLE;
-  release(&newProc->lock);
+  release(&np->lock);
 
-  return newProc->pid;
+  acquire(&wait_lock);
+  np->parent = p;
+  release(&wait_lock);
+
+  acquire(&np->lock);
+  np->state = RUNNABLE;
+  release(&np->lock);
+
+  return pid;
+ 
 }
 
 uint64
 thread_join(int thread_id){
-  struct proc *cur = myproc();
+  struct proc *curProc = myproc();
+  struct proc *temp;
+  int found;
+
+  acquire(&wait_lock);
 
   while(1){
-    for(struct proc *t = proc; t < &proc[NPROC]; t++){
-      if(t->pid == thread_id && t->parent == cur){
-        if(t->state == ZOMBIE){
-          freeproc(t);
+    found = 0;
+    for(temp = proc; temp < &proc[NPROC]; temp++){
+      if(temp->parent == curProc && temp->pid == thread_id){
+        found = 1;
+        if(temp->state == ZOMBIE){
+          freeproc(temp);
+          release(&wait_lock);
           return 0;
         }
       }
     }
-    sleep(cur, &cur->lock);
+    if(!found){
+      release(&wait_lock);
+      return -1;
+    }
   }
-  return -1;
 }
 
 void
 thread_exit(void)
 {
-  struct proc *cur = myproc();
-  
-  acquire(&cur->lock);
-  cur->xstate = 0;
-  cur->state = ZOMBIE;
+  struct proc *p = myproc();
 
-  wakeup(cur->parent);
+  if(p == initproc)
+    panic("init exiting");
+
+  for(int fd = 0; fd < NOFILE; fd++){
+    if(p->ofile[fd]){
+      fileclose(p->ofile[fd]);
+      p->ofile[fd] = 0;
+    }
+  }
+
+  begin_op();
+  iput(p->cwd);
+  end_op();
+  p->cwd = 0;
+
+  wakeup(p->parent);
+  
+  acquire(&p->lock);
+  p->xstate = 0;
+  p->state = ZOMBIE;
+
 
   sched();
   panic("zombie exit");

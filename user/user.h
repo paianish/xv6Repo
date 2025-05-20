@@ -24,7 +24,7 @@ int sleep(int);
 int uptime(void);
 int spoon(void*);
 int thread_create(void (*start_routine)(void*), void *arg, void *stack);
-int thread_join(int);
+int thread_join(int thread_id);
 void thread_exit();
 
 // ulib.c
