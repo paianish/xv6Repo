@@ -713,7 +713,8 @@ thread_create(void *start_func, void *arg, void *stack){
   np->sz = p->sz;
 
   // copy saved user registers.
-  memset(np->trapframe, 0, sizeof(struct trapframe));
+  *(np->trapframe) = *(p->trapframe);
+
 
   // Cause fork to return 0 in the child.
   np->trapframe->epc = (uint64) start_func;

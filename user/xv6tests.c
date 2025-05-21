@@ -160,9 +160,6 @@ int test_shared_mem_advanced(){
   sleep(1);
   int tid = thread_create((void *) shared_thread_one, (void*)&arg, stack);
   thread_join(tid);
-  sleep(1);
-
-  strcpy(shared_buffer, "E");
 
   arg = 5;
   tid = thread_create((void *) shared_thread_two, (void*)&arg, stack);
