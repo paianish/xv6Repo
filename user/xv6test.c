@@ -19,7 +19,7 @@ void my_thread_func(void *arg){
   }
 
   printf("\t[T%d] Reads %s from shared_buffer\n", thread_num, shared_buffer);
-  shared_buffer[0] = 'A' + thread_num;
+  strcpy(shared_buffer,(char[]){'A'+ thread_num, '\0'});
   printf("\t[T%d] Wrote %c to shared_buffer\n", thread_num, shared_buffer[0]);
   sleep(10);
 
@@ -33,7 +33,7 @@ void shared_thread_one(void *arg){
   printf("\t[T%d] Running \n", thread_num);
   sleep(10);
   printf("\t[T%d] Reads %s from shared_buffer\n", thread_num, shared_buffer);
-  shared_buffer[0] = 'A' + thread_num;
+  strcpy(shared_buffer,(char[]){'A'+ thread_num, '\0'});
   printf("\t[T%d] Wrote %c to shared_buffer\n", thread_num, shared_buffer[0]);
   sleep(10);
   printf("\t[T%d] Exiting\n", thread_num);
@@ -47,9 +47,12 @@ void shared_thread_two(void *arg){
   sleep(10);
   printf("\t[T%d] Reads %s from shared_buffer\n", thread_num, shared_buffer);
   if(shared_buffer[0] == 'E'){
-    printf("\t[PASS] Thread%d read the correct value from shared buffer\n", thread_num);
+    printf("\t[PASS] T%d read the correct value from shared buffer\n", thread_num);
+  } else{
+    printf("\t[FAIL] T%d read the incorrect value from shared buffer\n", thread_num);
+    thread_exit();
   }
-  shared_buffer[0] = 'A' + thread_num;
+  strcpy(shared_buffer,(char[]){'A'+ thread_num, '\0'});
   printf("\t[T%d] Wrote %c to shared_buffer\n", thread_num, shared_buffer[0]);
   sleep(10);
   printf("\t[T%d] Exiting\n", thread_num);
@@ -61,7 +64,7 @@ void shared_thread_two(void *arg){
 int test_thread_create(){
   printf("=========== TEST 1: thread_create ===========\n");
 
-  void *stack = malloc(4096);
+  void *stack = sbrk(4096);
   if(!stack){
     printf("\t[FAIL] malloc failed\n");
     return 0;
@@ -84,6 +87,7 @@ int test_thread_create(){
     printf("\t[FAIL] thread_join failed\n");
     return 0;
   }
+  printf("\t[Parent] Reads %s from shared_buffer\n",shared_buffer);
   printf("\t[PASS] thread_create worked and thread exited\n");
   return 1;
 }
@@ -92,8 +96,8 @@ int test_thread_create(){
 int test_thread_exit_and_join(){
   printf("=========== TEST 2: thread_exit + thread_join ===========\n");
   
-  void *stack1 = malloc(4096);
-  void *stack2 = malloc(4096);
+  void *stack1 = sbrk(4096);
+  void *stack2 = sbrk(4096);
   int arg1 = 1;
   int arg2 = 2;
 
@@ -118,6 +122,7 @@ int test_thread_exit_and_join(){
   thread_join(tid1);
   thread_join(tid2);
 
+  printf("\t[Parent] Reads %s from shared_buffer\n",shared_buffer);
   printf("\t[PASS] both threads exited and joined successfully\n");
   return 1;
 }
@@ -126,7 +131,7 @@ int test_shared_memory(){
 
   printf("=========== TEST 3: shared memory between threads ===========\n");
 
-  void *stack = malloc(4096);
+  void *stack = sbrk(4096);
   if(!stack){
     printf("\t[FAIL] malloc failed\n");
     return 0;
@@ -142,13 +147,14 @@ int test_shared_memory(){
 
   thread_join(tid);
   
+  printf("\t[Parent] Reads %s from shared_buffer\n",shared_buffer);
   printf("\t[PASS] shared_buffer successfully modified by thread: %d\n", arg);
   return 1;
 }
 
 int test_shared_mem_advanced(){
   printf("=========== TEST 4: advanced shared memory between threads ===========\n");
-  void *stack = malloc(4096);
+  void *stack = sbrk(4096);
   if(!stack){
     printf("\t[FAIL] malloc failed\n");
     return 0;
@@ -162,13 +168,12 @@ int test_shared_mem_advanced(){
   thread_join(tid);
   sleep(1);
 
-  strcpy(shared_buffer, "E");
-
   arg = 5;
   tid = thread_create((void *) shared_thread_two, (void*)&arg, stack);
   thread_join(tid);
 
   
+  printf("\t[Parent] Reads %s from shared_buffer\n",shared_buffer);
   printf("\t[PASS] shared_buffer successfully modified by thread: %d\n", arg);
   return 1;
 }

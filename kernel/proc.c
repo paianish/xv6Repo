@@ -691,6 +691,24 @@ spoon(void *arg){
   return 0;
 }
 
+int 
+cpytable(pagetable_t src, pagetable_t dest, uint64 sz) {
+  for(uint64 va = 0; va < sz; va += PGSIZE){
+    pte_t *pte = walk(src, va, 0);
+    if(!pte || (*pte & PTE_V) == 0){
+      continue;
+    }
+
+    uint64 pa = PTE2PA(*pte);
+    int flags = PTE_FLAGS(*pte);
+
+    if(mappages(dest, va, PGSIZE, pa, flags) != 0){
+      return -1;
+    }
+  }
+  return 0;
+}
+
 uint64
 thread_create(void *start_func, void *arg, void *stack){
 
@@ -704,7 +722,7 @@ thread_create(void *start_func, void *arg, void *stack){
   }
 
   // Copy user memory from parent to child.
-  if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
+  if(cpytable(p->pagetable, np->pagetable, p->sz) < 0){
     freeproc(np);
     release(&np->lock);
     return -1;
