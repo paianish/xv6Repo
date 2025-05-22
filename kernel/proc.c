@@ -254,15 +254,38 @@ userinit(void)
   release(&p->lock);
 }
 
+int
+comparetable(pagetable_t src, pagetable_t dest, uint64 sz){
+  for(uint64 va = 0; va < sz; va += PGSIZE){
+    pte_t *spte = walk(src, va, 0);
+    pte_t *dpte = walk(dest, va, 0);
+
+    if((!spte || (*spte & PTE_V) == 0) && (!dpte || (*dpte & PTE_V) == 0)){
+      continue;
+    }
+
+    if((!spte || (*spte & PTE_V) == 0) || (!dpte || (*dpte & PTE_V) == 0)){
+      return 0;
+    }
+
+    if(PTE2PA(*spte) != PTE2PA(*dpte) || PTE_FLAGS(*spte) != PTE_FLAGS(*dpte)){
+      return 0;
+    }
+
+  }
+  return 1;
+}
+
 // Grow or shrink user memory by n bytes.
 // Return 0 on success, -1 on failure.
 int
 growproc(int n)
 {
-  uint64 sz;
+  uint64 sz, cursz;
   struct proc *p = myproc();
 
   sz = p->sz;
+  cursz = p->sz;
   if(n > 0){
     if((sz = uvmalloc(p->pagetable, sz, sz + n, PTE_W)) == 0) {
       return -1;
@@ -270,11 +293,17 @@ growproc(int n)
   } else if(n < 0){
     sz = uvmdealloc(p->pagetable, sz, sz + n);
   }
+
   for(struct proc *t = proc; t < &proc[NPROC]; t++){
-    if(t->state != UNUSED && t->pagetable == p->pagetable){
-      t->sz = sz;
+    if(t->state != UNUSED && t->pid != p->pid){
+      int equal = comparetable(p->pagetable, t->pagetable, cursz);
+      if(equal == 1){
+        t->sz = sz;
+      }
     }
   }
+
+  p->sz = sz;
   return 0;
 }
 
