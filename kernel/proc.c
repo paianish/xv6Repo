@@ -270,7 +270,11 @@ growproc(int n)
   } else if(n < 0){
     sz = uvmdealloc(p->pagetable, sz, sz + n);
   }
-  p->sz = sz;
+  for(struct proc *t = proc; t < &proc[NPROC]; t++){
+    if(t->state != UNUSED && t->pagetable == p->pagetable){
+      t->sz = sz;
+    }
+  }
   return 0;
 }
 

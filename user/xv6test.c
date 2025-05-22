@@ -36,7 +36,6 @@ void shared_thread_one(void *arg){
   strcpy(shared_buffer,(char[]){'A'+ thread_num, '\0'});
   printf("\t[T%d] Wrote %c to shared_buffer\n", thread_num, shared_buffer[0]);
   sleep(10);
-  printf("\t[T%d] Exiting\n", thread_num);
   thread_exit();
 }
 
@@ -172,6 +171,7 @@ int test_shared_mem_advanced(){
   tid = thread_create((void *) shared_thread_two, (void*)&arg, stack);
   thread_join(tid);
 
+  printf("\t[T4] Exiting\n");
   
   printf("\t[Parent] Reads %s from shared_buffer\n",shared_buffer);
   printf("\t[PASS] shared_buffer successfully modified by thread: %d\n", arg);
