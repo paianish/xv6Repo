@@ -31,9 +31,8 @@ void shared_thread_one(void *arg){
   int thread_num = *(int *)arg;
 
   printf("\t[T%d] Running \n", thread_num);
-  sleep(10);
   printf("\t[T%d] Reads %s from shared_buffer\n", thread_num, shared_buffer);
-  char *shared_buffer = (char *)sbrk(4096);
+  *shared_buffer = (char *)sbrk(4096);
   printf("\t[T%d] Reallocead shared_buffer using sbrk\n", thread_num);
   strcpy(shared_buffer,(char[]){'A'+ thread_num, '\0'});
   printf("\t[T%d] Wrote %c to shared_buffer\n", thread_num, shared_buffer[0]);
@@ -46,7 +45,7 @@ void shared_thread_two(void *arg){
   int thread_num = *(int *)arg;
 
   printf("\t[T%d] Running \n", thread_num);
-  sleep(10);
+  sleep(15);
   printf("\t[T%d] Reads %s from shared_buffer\n", thread_num, shared_buffer);
   if(shared_buffer[0] == 'E'){
     printf("\t[PASS] T%d read the correct value from shared_buffer\n", thread_num);
